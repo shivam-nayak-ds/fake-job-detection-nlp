@@ -1,0 +1,1 @@
+DATA_PATH = "C:\fake-job-detection-nlp\data\raw_data\fake_job_postings.csv"
