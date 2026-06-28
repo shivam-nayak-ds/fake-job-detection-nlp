@@ -16,6 +16,13 @@ API_URL         = os.environ.get("API_URL", CONFIG["ui"]["api_url"])
 API_EXPLAIN_URL = API_URL.replace("/predict", "/explain")
 API_HEALTH_URL  = API_URL.replace("/predict", "")
 
+def check_api():
+    try:
+        res = requests.get(API_HEALTH_URL, timeout=1.0)
+        return res.status_code == 200
+    except:
+        return False
+
 # ── Caching Local Model & Explainer for Fallback Mode ──────────────────────
 @st.cache_resource
 def load_local_engine():
@@ -91,20 +98,7 @@ st.markdown("<div class='sub-title'>AI-powered Fake Job Detection · XGBoost + T
 with st.sidebar:
     st.title("⚙️ Settings")
 
-    def check_api():
-        try:
-            res = requests.get(API_HEALTH_URL, timeout=1.5)
-            return res.status_code == 200
-        except:
-            return False
-
-    api_online = check_api()
-    if api_online:
-        st.success("✅ API Backend Online")
-        st.caption("Running predictions via external FastAPI backend.")
-    else:
-        st.info("ℹ️ Standalone Mode Enabled")
-        st.caption("No external backend needed. Model & SHAP explainer are running locally in the Streamlit container.")
+    # Checked silently in the background when analyzing
 
     st.markdown("---")
     top_n = st.slider("Top SHAP features to show", min_value=5, max_value=15, value=10)
@@ -148,6 +142,7 @@ if analyze:
             top_features = []
 
             # ── Run using API if online, otherwise Fallback to Local Engine ──
+            api_online = check_api()
             if api_online:
                 try:
                     response = requests.post(
@@ -160,8 +155,7 @@ if analyze:
                     prediction   = data["prediction"]
                     confidence   = data["confidence"]  # probability of class 1 (Fake)
                     top_features = data["top_features"]
-                except Exception as api_err:
-                    st.error(f"API Error: {api_err}. Falling back to local engine...")
+                except:
                     api_online = False
 
             if not api_online:
