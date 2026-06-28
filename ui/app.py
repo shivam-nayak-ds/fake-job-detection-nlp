@@ -9,9 +9,12 @@ import plotly.graph_objects as go
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.config import CONFIG
 
-API_URL         = CONFIG["ui"]["api_url"]
+# ── API URL: env variable takes priority (production), config is fallback (local) ──
+# On Streamlit Cloud: set API_URL = https://your-api.onrender.com/predict
+# Locally: reads from config/config.yaml automatically
+API_URL         = os.environ.get("API_URL", CONFIG["ui"]["api_url"])
 API_EXPLAIN_URL = API_URL.replace("/predict", "/explain")
-API_HEALTH_URL  = CONFIG["ui"]["api_health_url"]
+API_HEALTH_URL  = API_URL.replace("/predict", "")
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(

@@ -20,13 +20,16 @@ ENV/
 
 # ───────────────────────────────────────────────────
 # DVC — large data & model files (managed by DVC, not Git)
+# ─ NOTE: model.pkl + vectorizer.pkl are committed to Git
+#   (only ~600 KB total) so Render/Streamlit Cloud can deploy
+#   without a DVC remote. Raw CSVs are still DVC-tracked.
 # ───────────────────────────────────────────────────
 data/raw_data/fake_job_postings.csv
 artifacts/data.csv
 artifacts/train.csv
 artifacts/test.csv
-artifacts/model.pkl
-artifacts/vectorizer.pkl
+# artifacts/model.pkl       ← committed to Git for deployment
+# artifacts/vectorizer.pkl  ← committed to Git for deployment
 
 # DVC internal cache & tmp (not needed in repo)
 .dvc/cache/
