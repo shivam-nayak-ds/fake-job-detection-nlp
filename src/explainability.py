@@ -13,6 +13,7 @@ Usage:
 
 import numpy as np
 import shap
+from typing import List, Dict
 
 
 class SHAPExplainer:
@@ -35,7 +36,7 @@ class SHAPExplainer:
         # TreeExplainer is fast and exact for XGBoost
         self.explainer = shap.TreeExplainer(model)
 
-    def explain(self, text: str, top_n: int = 10) -> list[dict]:
+    def explain(self, text: str, top_n: int = 10) -> List[Dict]:
         """
         Compute SHAP values for a single job description.
 

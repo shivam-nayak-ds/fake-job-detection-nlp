@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# DVC cache (large, not needed in image)
+.dvc/cache
+.dvc/tmp
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Notebooks (not needed at runtime)
+notebooks/
+
+# Logs
+logs/
+*.log
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Dev tools
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+
+# DVC metrics (small, ok to include — comment out if unwanted)
+# dvclive/

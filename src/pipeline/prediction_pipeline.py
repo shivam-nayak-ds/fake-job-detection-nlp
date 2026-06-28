@@ -11,32 +11,29 @@ class PredictionPipeline:
         with open(cfg["transformation"]["vectorizer_path"], "rb") as f:
             self.vectorizer = pickle.load(f)
 
-    # 🔹 Simple job check
-    def is_job_text(self, text):
-        keywords = ["job", "hiring", "experience", "developer", "engineer", "analyst"]
-        return any(word in text.lower() for word in keywords)
+    def predict(self, text: str):
+        """
+        Predict whether a job description is Real or Fake.
 
-    def predict(self, text):
+        Returns
+        -------
+        label      : "Fake Job" | "Real Job"
+        confidence : float (0-1), probability of the predicted class
+        reason     : short human-readable explanation
+        """
+        if len(text.strip()) < 10:
+            return "Invalid Input", 0.0, "Description too short (min 10 characters)"
 
-        # ❌ Invalid input
-        if len(text.strip()) < 5:
-            return "Invalid Input ❌", 0.0, "Too short input"
-
-        # ❌ Not job related
-        if not self.is_job_text(text):
-            return "Not a Job Description ❌", 0.0, "No job-related keywords found"
-
-        # Use cached model and vectorizer
         transformed = self.vectorizer.transform([text])
-        prob = self.model.predict_proba(transformed)[0][1]
+        prob = self.model.predict_proba(transformed)[0][1]  # P(Fake)
 
-        if prob > 0.6:
-            label = "Fake Job"
-            reason = "Suspicious wording detected"
+        if prob > 0.5:
+            label      = "Fake Job"
+            reason     = "Suspicious patterns detected in the job description"
+            confidence = prob
         else:
-            label = "Real Job"
-            reason = "Professional job-related content"
+            label      = "Real Job"
+            reason     = "Professional job-related content detected"
+            confidence = 1 - prob
 
-        confidence = prob if label == "Fake Job" else (1 - prob)
-
-        return label, confidence, reason
+        return label, round(confidence, 3), reason
