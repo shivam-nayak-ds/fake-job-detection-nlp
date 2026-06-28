@@ -103,8 +103,8 @@ with st.sidebar:
         st.success("✅ API Backend Online")
         st.caption("Running predictions via external FastAPI backend.")
     else:
-        st.warning("⚠️ API Backend Offline")
-        st.info("💡 Running in **Local Engine** mode. Model is loaded directly inside Streamlit container.")
+        st.info("ℹ️ Standalone Mode Enabled")
+        st.caption("No external backend needed. Model & SHAP explainer are running locally in the Streamlit container.")
 
     st.markdown("---")
     top_n = st.slider("Top SHAP features to show", min_value=5, max_value=15, value=10)
