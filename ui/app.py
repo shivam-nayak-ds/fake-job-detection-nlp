@@ -8,13 +8,24 @@ import plotly.graph_objects as go
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.config import CONFIG
+from src.pipeline.prediction_pipeline import PredictionPipeline
+from src.explainability import SHAPExplainer
 
 # ── API URL: env variable takes priority (production), config is fallback (local) ──
-# On Streamlit Cloud: set API_URL = https://your-api.onrender.com/predict
-# Locally: reads from config/config.yaml automatically
 API_URL         = os.environ.get("API_URL", CONFIG["ui"]["api_url"])
 API_EXPLAIN_URL = API_URL.replace("/predict", "/explain")
 API_HEALTH_URL  = API_URL.replace("/predict", "")
+
+# ── Caching Local Model & Explainer for Fallback Mode ──────────────────────
+@st.cache_resource
+def load_local_engine():
+    try:
+        pipeline = PredictionPipeline()
+        explainer = SHAPExplainer(pipeline.model, pipeline.vectorizer)
+        return pipeline, explainer
+    except Exception as e:
+        st.error(f"Failed to load local prediction engine: {e}")
+        return None, None
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -82,15 +93,18 @@ with st.sidebar:
 
     def check_api():
         try:
-            res = requests.get(API_HEALTH_URL, timeout=2)
+            res = requests.get(API_HEALTH_URL, timeout=1.5)
             return res.status_code == 200
         except:
             return False
 
-    if check_api():
-        st.success("✅ API Connected")
+    api_online = check_api()
+    if api_online:
+        st.success("✅ API Backend Online")
+        st.caption("Running predictions via external FastAPI backend.")
     else:
-        st.error("❌ API Offline — start the FastAPI server")
+        st.warning("⚠️ API Backend Offline")
+        st.info("💡 Running in **Local Engine** mode. Model is loaded directly inside Streamlit container.")
 
     st.markdown("---")
     top_n = st.slider("Top SHAP features to show", min_value=5, max_value=15, value=10)
@@ -129,19 +143,44 @@ if analyze:
         st.warning("⚠️ Job description is too short (min 10 characters).")
     else:
         with st.spinner("Analyzing with AI + computing SHAP explanations... 🤖"):
-            try:
-                response = requests.post(
-                    API_EXPLAIN_URL,
-                    json={"description": text},
-                    timeout=30
-                )
-                response.raise_for_status()
-                data = response.json()
+            prediction = None
+            confidence = None
+            top_features = []
 
-                prediction   = data["prediction"]
-                confidence   = data["confidence"]
-                top_features = data["top_features"]
+            # ── Run using API if online, otherwise Fallback to Local Engine ──
+            if api_online:
+                try:
+                    response = requests.post(
+                        API_EXPLAIN_URL,
+                        json={"description": text},
+                        timeout=10
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    prediction   = data["prediction"]
+                    confidence   = data["confidence"]  # probability of class 1 (Fake)
+                    top_features = data["top_features"]
+                except Exception as api_err:
+                    st.error(f"API Error: {api_err}. Falling back to local engine...")
+                    api_online = False
 
+            if not api_online:
+                # Local execution
+                pipeline, explainer = load_local_engine()
+                if pipeline and explainer:
+                    try:
+                        # Vectorize and predict probability directly
+                        vec = pipeline.vectorizer.transform([text])
+                        prob = pipeline.model.predict_proba(vec)[0][1] # P(Fake)
+                        
+                        prediction = "Fake Job" if prob > 0.5 else "Real Job"
+                        confidence = float(prob)
+                        top_features = explainer.explain(text, top_n=15)
+                    except Exception as local_err:
+                        st.error(f"Local Engine Error: {local_err}")
+
+            # ── Render UI Results if success ──────────────────────────────────
+            if prediction is not None and confidence is not None:
                 # ── Result Banner ─────────────────────────────────────────────
                 st.markdown("---")
                 col1, col2, col3 = st.columns([2, 1, 1])
@@ -165,58 +204,59 @@ if analyze:
                             text=f"Fake score: {fake_pct}%")
 
                 # ── SHAP Explanation Chart ────────────────────────────────────
-                st.markdown("---")
-                st.markdown("### 🧠 SHAP Explanation — Why did the model decide this?")
-                st.markdown(
-                    "<div class='shap-label'>Top words influencing the prediction</div>",
-                    unsafe_allow_html=True
-                )
-
-                # Trim to requested top_n
-                features = top_features[:top_n]
-
-                words  = [f["word"] for f in features]
-                values = [f["shap_value"] for f in features]
-                dirs   = [f["direction"] for f in features]
-
-                colors = ["#ff4b4b" if d == "fake" else "#21c55d" for d in dirs]
-
-                fig = go.Figure(go.Bar(
-                    x           = values,
-                    y           = words,
-                    orientation = "h",
-                    marker_color= colors,
-                    text        = [f"{v:+.3f}" for v in values],
-                    textposition= "outside",
-                    hovertemplate=(
-                        "<b>%{y}</b><br>"
-                        "SHAP value: %{x:.4f}<br>"
-                        "<extra></extra>"
+                if top_features:
+                    st.markdown("---")
+                    st.markdown("### 🧠 SHAP Explanation — Why did the model decide this?")
+                    st.markdown(
+                        "<div class='shap-label'>Top words influencing the prediction</div>",
+                        unsafe_allow_html=True
                     )
-                ))
 
-                fig.update_layout(
-                    xaxis_title  = "SHAP Value  (+ = Fake, - = Real)",
-                    yaxis_title  = "Word / Feature",
-                    yaxis        = dict(autorange="reversed"),
-                    plot_bgcolor = "rgba(0,0,0,0)",
-                    paper_bgcolor= "rgba(0,0,0,0)",
-                    font         = dict(size=13),
-                    height       = max(350, top_n * 38),
-                    margin       = dict(l=10, r=80, t=20, b=40),
-                    xaxis        = dict(zeroline=True, zerolinecolor="#555", zerolinewidth=1.5),
-                )
+                    # Trim to requested top_n
+                    features = top_features[:top_n]
 
-                st.plotly_chart(fig, use_container_width=True)
+                    words  = [f["word"] for f in features]
+                    values = [f["shap_value"] for f in features]
+                    dirs   = [f["direction"] for f in features]
 
-                # ── Feature table ─────────────────────────────────────────────
-                with st.expander("📊 Raw SHAP values (table)"):
-                    df = pd.DataFrame(features)
-                    df["direction"] = df["direction"].map(
-                        {"fake": "🔴 Fake", "real": "🟢 Real"}
+                    colors = ["#ff4b4b" if d == "fake" else "#21c55d" for d in dirs]
+
+                    fig = go.Figure(go.Bar(
+                        x           = values,
+                        y           = words,
+                        orientation = "h",
+                        marker_color= colors,
+                        text        = [f"{v:+.3f}" for v in values],
+                        textposition= "outside",
+                        hovertemplate=(
+                            "<b>%{y}</b><br>"
+                            "SHAP value: %{x:.4f}<br>"
+                            "<extra></extra>"
+                        )
+                    ))
+
+                    fig.update_layout(
+                        xaxis_title  = "SHAP Value  (+ = Fake, - = Real)",
+                        yaxis_title  = "Word / Feature",
+                        yaxis        = dict(autorange="reversed"),
+                        plot_bgcolor = "rgba(0,0,0,0)",
+                        paper_bgcolor= "rgba(0,0,0,0)",
+                        font         = dict(size=13),
+                        height       = max(350, top_n * 38),
+                        margin       = dict(l=10, r=80, t=20, b=40),
+                        xaxis        = dict(zeroline=True, zerolinecolor="#555", zerolinewidth=1.5),
                     )
-                    df.columns = ["Word", "SHAP Value", "Pushes Towards"]
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # ── Feature table ─────────────────────────────────────────────
+                    with st.expander("📊 Raw SHAP values (table)"):
+                        df = pd.DataFrame(features)
+                        df["direction"] = df["direction"].map(
+                            {"fake": "🔴 Fake", "real": "🟢 Real"}
+                        )
+                        df.columns = ["Word", "SHAP Value", "Pushes Towards"]
+                        st.dataframe(df, use_container_width=True, hide_index=True)
 
                 # ── History ───────────────────────────────────────────────────
                 if "history" not in st.session_state:
@@ -227,11 +267,6 @@ if analyze:
                     "prediction": prediction,
                     "confidence": f"{fake_pct}%"
                 })
-
-            except requests.exceptions.ConnectionError:
-                st.error("Cannot connect to API. Make sure the FastAPI server is running.")
-            except Exception as e:
-                st.error(f"Error: {e}")
 
 # ── History ───────────────────────────────────────────────────────────────────
 st.markdown("---")
@@ -251,6 +286,6 @@ else:
 st.markdown("""
 ---
 <center style='color:#666; font-size:0.85rem;'>
-    Trust-Hire &nbsp;·&nbsp; Built with FastAPI + Streamlit + XGBoost + SHAP 🚀
+    Trust-Hire &nbsp;·&nbsp; Built with Streamlit + XGBoost + SHAP 🚀
 </center>
 """, unsafe_allow_html=True)
