@@ -55,5 +55,7 @@ class TrainingPipeline:
 
             print("🎉 Pipeline completed successfully")
 
+            return acc  # returned so main.py can write to dvclive/metrics.json
+
         except Exception as e:
             raise CustomException(e, sys)

@@ -1,0 +1,20 @@
+data:
+  raw_data_path: data/raw_data/fake_job_postings.csv
+  test_size: 0.2
+  random_state: 42
+
+transformation:
+  max_features: 5000
+  text_columns:
+    - title
+    - description
+    - requirements
+    - benefits
+    - company_profile
+  target_column: fraudulent
+
+model:
+  learning_rate: 0.08
+  max_depth: 6
+  n_estimators: 200
+  eval_metric: logloss

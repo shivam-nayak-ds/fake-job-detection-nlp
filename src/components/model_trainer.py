@@ -1,16 +1,23 @@
 import sys
 import os
 import pickle
+import pandas as pd
 
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
 from src.exception import CustomException
+from src.config import CONFIG
 
 
 class ModelTrainer:
     def __init__(self):
-        self.model_path = os.path.join("artifacts", "model.pkl")
+        cfg = CONFIG["model"]
+        self.model_path = cfg["model_path"]
+        self.learning_rate = cfg["learning_rate"]
+        self.max_depth = cfg["max_depth"]
+        self.n_estimators = cfg["n_estimators"]
+        self.eval_metric = cfg["eval_metric"]
 
     def initiate_model_training(self, X_train, X_test, y_train, y_test):
         try:
@@ -19,7 +26,6 @@ class ModelTrainer:
             # =========================
             # Debug: Check class distribution
             # =========================
-            import pandas as pd
             print("\n📊 y_train distribution:\n", pd.Series(y_train).value_counts())
             print("\n📊 y_test distribution:\n", pd.Series(y_test).value_counts())
 
@@ -34,15 +40,14 @@ class ModelTrainer:
             print(f"\n⚖️ scale_pos_weight: {scale_pos_weight:.2f}")
 
             # =========================
-            # Model (IMPROVED)
+            # Model — hyperparameters from config.yaml
             # =========================
             model = XGBClassifier(
-                learning_rate=0.08,
-                max_depth=6,
-                n_estimators=200,
-                scale_pos_weight=scale_pos_weight,  # 🔥 dynamic
-                eval_metric='logloss',
-                use_label_encoder=False
+                learning_rate=self.learning_rate,
+                max_depth=self.max_depth,
+                n_estimators=self.n_estimators,
+                scale_pos_weight=scale_pos_weight,
+                eval_metric=self.eval_metric
             )
 
             # =========================

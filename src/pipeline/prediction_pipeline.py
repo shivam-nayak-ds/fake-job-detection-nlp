@@ -1,10 +1,15 @@
 import pickle
+from src.config import CONFIG
 
 
 class PredictionPipeline:
     def __init__(self):
-        self.model_path = "artifacts/model.pkl"
-        self.vectorizer_path = "artifacts/vectorizer.pkl"
+        cfg = CONFIG
+        # Load once at init — not on every prediction call
+        with open(cfg["model"]["model_path"], "rb") as f:
+            self.model = pickle.load(f)
+        with open(cfg["transformation"]["vectorizer_path"], "rb") as f:
+            self.vectorizer = pickle.load(f)
 
     # 🔹 Simple job check
     def is_job_text(self, text):
@@ -21,16 +26,9 @@ class PredictionPipeline:
         if not self.is_job_text(text):
             return "Not a Job Description ❌", 0.0, "No job-related keywords found"
 
-        # Load model
-        with open(self.model_path, "rb") as f:
-            model = pickle.load(f)
-
-        with open(self.vectorizer_path, "rb") as f:
-            vectorizer = pickle.load(f)
-
-        transformed = vectorizer.transform([text])
-
-        prob = model.predict_proba(transformed)[0][1]
+        # Use cached model and vectorizer
+        transformed = self.vectorizer.transform([text])
+        prob = self.model.predict_proba(transformed)[0][1]
 
         if prob > 0.6:
             label = "Fake Job"

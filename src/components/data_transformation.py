@@ -6,17 +6,22 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from src.exception import CustomException
 from src.logger import logging
+from src.config import CONFIG
 
 
 class DataTransformationConfig:
     def __init__(self):
-        self.preprocessor_path = os.path.join("artifacts", "vectorizer.pkl")
+        cfg = CONFIG["transformation"]
+        self.preprocessor_path = cfg["vectorizer_path"]
+        self.max_features = cfg["max_features"]
+        self.text_columns = cfg["text_columns"]
+        self.target_column = cfg["target_column"]
 
 
 class DataTransformation:
     def __init__(self):
         self.config = DataTransformationConfig()
-        self.vectorizer = TfidfVectorizer(max_features=5000)
+        self.vectorizer = TfidfVectorizer(max_features=self.config.max_features)
 
     def initiate_data_transformation(self, train_path, test_path):
         try:
@@ -32,29 +37,18 @@ class DataTransformation:
             train_df = train_df.fillna("")
             test_df = test_df.fillna("")
 
-            # Combine text columns
-            train_df["text"] = (
-                train_df["title"] + " " +
-                train_df["description"] + " " +
-                train_df["requirements"] + " " +
-                train_df["benefits"] + " " +
-                train_df["company_profile"]
-            )
+            # Combine text columns — columns driven by config.yaml
+            cols = self.config.text_columns
+            train_df["text"] = train_df[cols].fillna("").agg(" ".join, axis=1)
+            test_df["text"]  = test_df[cols].fillna("").agg(" ".join, axis=1)
 
-            test_df["text"] = (
-                test_df["title"] + " " +
-                test_df["description"] + " " +
-                test_df["requirements"] + " " +
-                test_df["benefits"] + " " +
-                test_df["company_profile"]
-            )
-
-            # Input-output split
+            # Input-output split — target column from config.yaml
+            target = self.config.target_column
             X_train = train_df["text"]
-            y_train = train_df["fraudulent"]
+            y_train = train_df[target]
 
             X_test = test_df["text"]
-            y_test = test_df["fraudulent"]
+            y_test = test_df[target]
 
             # Vectorization
             X_train_vec = self.vectorizer.fit_transform(X_train)

@@ -1,28 +1,60 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from contextlib import asynccontextmanager
 import pickle
 import logging
 
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+from src.config import CONFIG
+
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="Fake Job Detection API")
+# Global holders for model artifacts
+model = None
+vectorizer = None
 
-# load model
-model = pickle.load(open("artifacts/model.pkl", "rb"))
-vectorizer = pickle.load(open("artifacts/vectorizer.pkl", "rb"))
 
-# request schema
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load model artifacts on startup, release on shutdown."""
+    global model, vectorizer
+    cfg = CONFIG
+    try:
+        with open(cfg["model"]["model_path"], "rb") as f:
+            model = pickle.load(f)
+        with open(cfg["transformation"]["vectorizer_path"], "rb") as f:
+            vectorizer = pickle.load(f)
+        logging.info("Model and vectorizer loaded successfully")
+    except FileNotFoundError as e:
+        logging.error(f"Artifact not found: {e}. Run main.py to train first.")
+        raise
+    yield
+    # Cleanup on shutdown (nothing needed for pickle objects)
+    model = None
+    vectorizer = None
+
+
+app = FastAPI(title="Fake Job Detection API", lifespan=lifespan)
+
+
+# Request schema
 class JobRequest(BaseModel):
-    description: str = Field(min_length=10, max_length=2000)
+    description: str = Field(
+        min_length=CONFIG["api"]["min_description_length"],
+        max_length=CONFIG["api"]["max_description_length"]
+    )
 
-# response schema
+
+# Response schema
 class PredictionResponse(BaseModel):
     prediction: str
     confidence: float
 
+
 @app.get("/")
 def home():
     return {"status": "API is running 🚀"}
+
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: JobRequest):

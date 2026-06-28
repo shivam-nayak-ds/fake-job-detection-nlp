@@ -5,13 +5,17 @@ from sklearn.model_selection import train_test_split
 
 from src.exception import CustomException
 from src.logger import logging
+from src.config import CONFIG
 
 
 class DataIngestionConfig:
     def __init__(self):
-        self.raw_data_path = os.path.join("artifacts", "data.csv")
-        self.train_data_path = os.path.join("artifacts", "train.csv")
-        self.test_data_path = os.path.join("artifacts", "test.csv")
+        cfg = CONFIG["data"]
+        self.raw_data_path = cfg["raw_data_artifact"]
+        self.train_data_path = cfg["train_data_path"]
+        self.test_data_path = cfg["test_data_path"]
+        self.test_size = cfg["test_size"]
+        self.random_state = cfg["random_state"]
 
 
 class DataIngestion:
@@ -22,8 +26,10 @@ class DataIngestion:
         try:
             logging.info("Data ingestion started")
 
-            # Read dataset
-            df = pd.read_csv(r"C:\fake-job-detection-nlp\data\raw_data\fake_job_postings.csv")
+            # Read dataset — path resolved relative to project root via config.yaml
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            raw_data_path = os.path.join(project_root, CONFIG["data"]["raw_data_path"])
+            df = pd.read_csv(raw_data_path)
             logging.info("Dataset loaded successfully")
 
             # Create artifacts directory
@@ -33,9 +39,11 @@ class DataIngestion:
             df.to_csv(self.ingestion_config.raw_data_path, index=False)
             logging.info("Raw data saved in artifacts folder")
 
-            # Train-test split
+            # Train-test split — values from config.yaml
             train_set, test_set = train_test_split(
-                df, test_size=0.2, random_state=42
+                df,
+                test_size=self.ingestion_config.test_size,
+                random_state=self.ingestion_config.random_state
             )
 
             # Save train and test data

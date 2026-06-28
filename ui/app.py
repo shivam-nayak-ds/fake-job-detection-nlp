@@ -1,7 +1,14 @@
 import streamlit as st
 import requests
+import sys
+import os
 
-API_URL = "http://localhost:8000/predict"
+# Add project root to path so src.config is importable
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config import CONFIG
+
+API_URL = CONFIG["ui"]["api_url"]
+API_HEALTH_URL = CONFIG["ui"]["api_health_url"]
 
 st.set_page_config(page_title="Fake Job Detector", layout="wide")
 
@@ -17,7 +24,7 @@ st.sidebar.title("⚙️ Settings")
 # API status check
 def check_api():
     try:
-        res = requests.get("http://127.0.0.1:8000", timeout=2)
+        res = requests.get(API_HEALTH_URL, timeout=2)
         return res.status_code == 200
     except:
         return False

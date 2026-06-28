@@ -1,24 +1,76 @@
+# ───────────────────────────────────────────────────
 # Python
+# ───────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
 
-# Virtual env
+# ───────────────────────────────────────────────────
+# Virtual environments
+# ───────────────────────────────────────────────────
 venv/
 env/
+.venv/
+ENV/
 
-# Data
+# ───────────────────────────────────────────────────
+# DVC — large data & model files (managed by DVC, not Git)
+# ───────────────────────────────────────────────────
+data/raw_data/fake_job_postings.csv
+artifacts/data.csv
+artifacts/train.csv
+artifacts/test.csv
+artifacts/model.pkl
+artifacts/vectorizer.pkl
 
-# MLflow
+# DVC internal cache & tmp (not needed in repo)
+.dvc/cache/
+.dvc/tmp/
+
+# ───────────────────────────────────────────────────
+# Logs
+# ───────────────────────────────────────────────────
+logs/
+*.log
+
+# ───────────────────────────────────────────────────
+# Jupyter Notebooks
+# ───────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ───────────────────────────────────────────────────
+# DVC Live / MLflow metrics
+# dvclive/ is committed so DVC can track metric changes
+# ───────────────────────────────────────────────────
 mlruns/
 
-# Logs
-logs/
-
-# OS files
+# ───────────────────────────────────────────────────
+# OS / Editor
+# ───────────────────────────────────────────────────
 .DS_Store
-
-# VS Code
+Thumbs.db
 .vscode/
+.idea/
+*.swp
+*.swo
 
+# ───────────────────────────────────────────────────
 # Secrets
+# ───────────────────────────────────────────────────
 .env
+.env.*
+secrets.yaml
+
+# ───────────────────────────────────────────────────
+# Test / Coverage artifacts
+# ───────────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
